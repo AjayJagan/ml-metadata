@@ -1,5 +1,9 @@
 FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
 
+# Multi-architecture build arguments
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
 USER root
 
 RUN dnf update -y -q && \
@@ -22,12 +26,12 @@ ENV BAZEL_VERSION 5.3.0
 WORKDIR /
 RUN mkdir /bazel && \
     cd /bazel && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-linux-x86_64.sh && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE && \
+    curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
+    curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE && \
     chmod +x bazel-*.sh && \
-    ./bazel-$BAZEL_VERSION-installer-linux-x86_64.sh && \
+    ./bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
     cd / && \
-    rm -f /bazel/bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
+    rm -f /bazel/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh
 
 COPY . /mlmd-src
 WORKDIR /mlmd-src
@@ -44,10 +48,20 @@ RUN \
 # Running in offline mode with --nofetch arg, cache and deps must be cloned 
 # into the local root bazel cache
 # "-std=c++17" is needed in order to build with ZetaSQL.
-RUN bazel build -c opt --action_env=PATH \
-  --define=grpc_no_ares=true \
-  //ml_metadata/metadata_store:metadata_store_server \
-  --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"
+# Multi-architecture build: set CPU based on TARGETARCH
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+      bazel build -c opt --action_env=PATH \
+        --define=grpc_no_ares=true \
+        --cpu=arm64 \
+        //ml_metadata/metadata_store:metadata_store_server \
+        --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"; \
+    else \
+      bazel build -c opt --action_env=PATH \
+        --define=grpc_no_ares=true \
+        --cpu=k8 \
+        //ml_metadata/metadata_store:metadata_store_server \
+        --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"; \
+    fi
 
 # copying libmysqlclient source onto THIRD_PARTY folder.
 RUN mkdir -p /mlmd-src/third_party
