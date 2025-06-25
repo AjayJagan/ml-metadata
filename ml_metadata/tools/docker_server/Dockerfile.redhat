@@ -26,12 +26,19 @@ ENV BAZEL_VERSION 5.3.0
 WORKDIR /
 RUN mkdir /bazel && \
     cd /bazel && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE && \
-    chmod +x bazel-*.sh && \
-    ./bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
-    cd / && \
-    rm -f /bazel/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh
+    if [ "$TARGETARCH" = "arm64" ]; then \
+      # ARM64: download binary directly (no installer script available for 5.3.0)
+      curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-arm64 && \
+      chmod +x bazel-$BAZEL_VERSION-linux-arm64 && \
+      ln -s /bazel/bazel-$BAZEL_VERSION-linux-arm64 /usr/local/bin/bazel; \
+    else \
+      # AMD64: use installer script
+      curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
+      chmod +x bazel-*.sh && \
+      ./bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
+      rm -f /bazel/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh; \
+    fi && \
+    curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE
 
 COPY . /mlmd-src
 WORKDIR /mlmd-src
