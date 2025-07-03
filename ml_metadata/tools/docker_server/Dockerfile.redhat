@@ -1,9 +1,5 @@
 FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
 
-# Multi-architecture build arguments
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
-
 USER root
 
 RUN dnf update -y -q && \
@@ -21,24 +17,42 @@ RUN dnf update -y -q && \
   findutils \
   python3
 
-# Set up Bazel 5.3.0
+# Set up Bazel
 ENV BAZEL_VERSION 5.3.0
 WORKDIR /
 RUN mkdir /bazel && \
     cd /bazel && \
-    if [ "$TARGETARCH" = "arm64" ]; then \
-      # ARM64: download binary directly (no installer script available for 5.3.0)
-      curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-arm64 && \
-      chmod +x bazel-$BAZEL_VERSION-linux-arm64 && \
-      ln -s /bazel/bazel-$BAZEL_VERSION-linux-arm64 /usr/local/bin/bazel; \
+    # Detect architecture using uname -m for podman compatibility
+    ARCH=$(uname -m) && \
+    case $ARCH in \
+        x86_64) \
+            BAZEL_ARCH="linux-x86_64" \
+            USER_AGENT_ARCH="x86_64" \
+            BAZEL_FILE="bazel-$BAZEL_VERSION-installer-$BAZEL_ARCH.sh" \
+            INSTALL_METHOD="installer" \
+            ;; \
+        aarch64|arm64) \
+            BAZEL_ARCH="linux-arm64" \
+            USER_AGENT_ARCH="arm64" \
+            BAZEL_FILE="bazel-$BAZEL_VERSION-$BAZEL_ARCH" \
+            INSTALL_METHOD="binary" \
+            ;; \
+        *) \
+            echo "Unsupported architecture: $ARCH" && exit 1 \
+            ;; \
+    esac && \
+    echo "Installing Bazel for architecture: $BAZEL_ARCH" && \
+    curl -H "User-Agent: Mozilla/5.0 (X11; Linux $USER_AGENT_ARCH) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/$BAZEL_FILE && \
+    curl -H "User-Agent: Mozilla/5.0 (X11; Linux $USER_AGENT_ARCH) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE && \
+    if [ "$INSTALL_METHOD" = "installer" ]; then \
+        chmod +x $BAZEL_FILE && \
+        ./$BAZEL_FILE; \
     else \
-      # AMD64: use installer script
-      curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
-      chmod +x bazel-*.sh && \
-      ./bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh && \
-      rm -f /bazel/bazel-$BAZEL_VERSION-installer-${TARGETOS}-${TARGETARCH}.sh; \
+        chmod +x $BAZEL_FILE && \
+        cp $BAZEL_FILE /usr/local/bin/bazel; \
     fi && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux ${TARGETARCH}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE
+    cd / && \
+    rm -f /bazel/$BAZEL_FILE
 
 COPY . /mlmd-src
 WORKDIR /mlmd-src
@@ -55,20 +69,10 @@ RUN \
 # Running in offline mode with --nofetch arg, cache and deps must be cloned 
 # into the local root bazel cache
 # "-std=c++17" is needed in order to build with ZetaSQL.
-# Multi-architecture build: set CPU based on TARGETARCH
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-      bazel build -c opt --action_env=PATH \
-        --define=grpc_no_ares=true \
-        --cpu=arm64 \
-        //ml_metadata/metadata_store:metadata_store_server \
-        --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"; \
-    else \
-      bazel build -c opt --action_env=PATH \
-        --define=grpc_no_ares=true \
-        --cpu=k8 \
-        //ml_metadata/metadata_store:metadata_store_server \
-        --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"; \
-    fi
+RUN bazel build -c opt --action_env=PATH \
+  --define=grpc_no_ares=true \
+  //ml_metadata/metadata_store:metadata_store_server \
+  --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"
 
 # copying libmysqlclient source onto THIRD_PARTY folder.
 RUN mkdir -p /mlmd-src/third_party
