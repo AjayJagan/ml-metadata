@@ -28,19 +28,6 @@ RUN dnf update -y -q && \
   sqlite-devel \
   libuuid-devel
 
-# Create stub cpuid.h for ARM64 compatibility
-RUN if [ "$(uname -m)" = "aarch64" ]; then \
-    echo "Creating stub cpuid.h for ARM64 compatibility" && \
-    mkdir -p /usr/include && \
-    echo "#ifndef CPUID_H" > /usr/include/cpuid.h && \
-    echo "#define CPUID_H" >> /usr/include/cpuid.h && \
-    echo "// Stub cpuid.h for ARM64 compatibility" >> /usr/include/cpuid.h && \
-    echo "// This file provides empty definitions for x86-specific CPUID functions" >> /usr/include/cpuid.h && \
-    echo "static inline void __cpuid(int info[4], int level) { (void)info; (void)level; }" >> /usr/include/cpuid.h && \
-    echo "static inline void __cpuid_count(int info[4], int level, int count) { (void)info; (void)level; (void)count; }" >> /usr/include/cpuid.h && \
-    echo "#endif" >> /usr/include/cpuid.h; \
-    fi
-
 # Set up Bazel
 ENV BAZEL_VERSION 5.3.0
 WORKDIR /

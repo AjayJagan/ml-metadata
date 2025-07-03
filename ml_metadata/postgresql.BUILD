@@ -60,10 +60,13 @@ cc_library(
         "src/port/inet_net_ntop.c",
         "src/port/noblock.c",
         "src/port/path.c",
-        "src/port/pg_bitutils.c",
+    ] + select({
+        "@//ml_metadata:x86_64": [
+            "src/port/pg_bitutils.c",
+        ],
+        "//conditions:default": [],
+    }) + [
         "src/port/pg_crc32c_sb8.c",
-        # Comment this line out to force usage of sb8 algorithm of crc32c
-        # "src/port/pg_crc32c_sse42_choose.c",
         "src/port/pg_strong_random.c",
         "src/port/pgcheckdir.c",
         "src/port/pgmkdirp.c",
