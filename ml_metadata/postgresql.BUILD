@@ -60,12 +60,7 @@ cc_library(
         "src/port/inet_net_ntop.c",
         "src/port/noblock.c",
         "src/port/path.c",
-    ] + select({
-        "@//ml_metadata:x86_64": [
-            "src/port/pg_bitutils.c",
-        ],
-        "//conditions:default": [],
-    }) + [
+        "src/port/pg_bitutils.c",
         "src/port/pg_crc32c_sb8.c",
         "src/port/pg_strong_random.c",
         "src/port/pgcheckdir.c",
@@ -601,7 +596,7 @@ genrule(
             "/* Define to 1 if your compiler understands __FUNCTION__. */",
             "/* #undef HAVE_FUNCNAME__FUNCTION */",
             "",
-            "/* Define to 1 if you have __atomic_compare_exchange_n(int *, int *, int). */",
+            "/* Define to 1 if you have __atomic_compare_exchange_n(int). */",
             "#define HAVE_GCC__ATOMIC_INT32_CAS 1",
             "",
             "/* Define to 1 if you have __atomic_compare_exchange_n(int64 *, int64 *,",

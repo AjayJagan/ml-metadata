@@ -28,6 +28,37 @@ RUN dnf update -y -q && \
   sqlite-devel \
   libuuid-devel
 
+# Create ARM64-compatible cpuid.h stub
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+    echo "Creating ARM64-compatible cpuid.h stub" && \
+    mkdir -p /usr/include && \
+    cat > /usr/include/cpuid.h << 'EOF' \
+#ifndef CPUID_H \
+#define CPUID_H \
+/* ARM64-compatible cpuid.h stub */ \
+/* Provides empty implementations for x86-specific CPUID functions */ \
+static inline void __cpuid(int info[4], int level) { \
+    (void)info; (void)level; \
+    /* Return empty CPUID info on ARM64 */ \
+    info[0] = info[1] = info[2] = info[3] = 0; \
+} \
+static inline void __cpuid_count(int info[4], int level, int count) { \
+    (void)info; (void)level; (void)count; \
+    /* Return empty CPUID info on ARM64 */ \
+    info[0] = info[1] = info[2] = info[3] = 0; \
+} \
+static inline void __get_cpuid(int level, int *eax, int *ebx, int *ecx, int *edx) { \
+    (void)level; \
+    /* Return empty CPUID info on ARM64 */ \
+    if (eax) *eax = 0; \
+    if (ebx) *ebx = 0; \
+    if (ecx) *ecx = 0; \
+    if (edx) *edx = 0; \
+} \
+#endif /* CPUID_H */ \
+EOF \
+    ; fi
+
 # Set up Bazel
 ENV BAZEL_VERSION 5.3.0
 WORKDIR /
