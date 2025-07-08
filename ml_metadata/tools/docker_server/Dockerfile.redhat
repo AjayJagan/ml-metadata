@@ -11,90 +11,21 @@ RUN dnf update -y -q && \
   cmake \
   make \
   openssl \
+  openssl-devel \
   ca-certificates \
   unzip \
   git \
   findutils \
-  python3 \
-  gcc-c++ \
-  glibc-devel \
-  kernel-headers \
-  libstdc++-devel \
-  zlib-devel \
-  ncurses-devel \
-  openssl-devel \
-  libffi-devel \
-  bzip2-devel \
-  sqlite-devel \
-  libuuid-devel
-
-# Create ARM64-compatible cpuid.h stub
-RUN if [ "$(uname -m)" = "aarch64" ]; then \
-    echo "Creating ARM64-compatible cpuid.h stub" && \
-    mkdir -p /usr/include && \
-    cat > /usr/include/cpuid.h << 'EOF' \
-#ifndef CPUID_H \
-#define CPUID_H \
-/* ARM64-compatible cpuid.h stub */ \
-/* Provides empty implementations for x86-specific CPUID functions */ \
-static inline void __cpuid(int info[4], int level) { \
-    (void)info; (void)level; \
-    /* Return empty CPUID info on ARM64 */ \
-    info[0] = info[1] = info[2] = info[3] = 0; \
-} \
-static inline void __cpuid_count(int info[4], int level, int count) { \
-    (void)info; (void)level; (void)count; \
-    /* Return empty CPUID info on ARM64 */ \
-    info[0] = info[1] = info[2] = info[3] = 0; \
-} \
-static inline void __get_cpuid(int level, int *eax, int *ebx, int *ecx, int *edx) { \
-    (void)level; \
-    /* Return empty CPUID info on ARM64 */ \
-    if (eax) *eax = 0; \
-    if (ebx) *ebx = 0; \
-    if (ecx) *ecx = 0; \
-    if (edx) *edx = 0; \
-} \
-#endif /* CPUID_H */ \
-EOF \
-    ; fi
+  python3
 
 # Set up Bazel
-ENV BAZEL_VERSION 5.3.0
+ENV BAZEL_VERSION 5.4.0
 WORKDIR /
-RUN mkdir /bazel && \
-    cd /bazel && \
-    # Detect architecture using uname -m for podman compatibility
-    ARCH=$(uname -m) && \
-    case $ARCH in \
-        x86_64) \
-            BAZEL_ARCH="linux-x86_64" \
-            USER_AGENT_ARCH="x86_64" \
-            BAZEL_FILE="bazel-$BAZEL_VERSION-installer-$BAZEL_ARCH.sh" \
-            INSTALL_METHOD="installer" \
-            ;; \
-        aarch64|arm64) \
-            BAZEL_ARCH="linux-arm64" \
-            USER_AGENT_ARCH="arm64" \
-            BAZEL_FILE="bazel-$BAZEL_VERSION-$BAZEL_ARCH" \
-            INSTALL_METHOD="binary" \
-            ;; \
-        *) \
-            echo "Unsupported architecture: $ARCH" && exit 1 \
-            ;; \
-    esac && \
-    echo "Installing Bazel for architecture: $BAZEL_ARCH" && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux $USER_AGENT_ARCH) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/$BAZEL_FILE && \
-    curl -H "User-Agent: Mozilla/5.0 (X11; Linux $USER_AGENT_ARCH) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36" -fSsL -o /bazel/LICENSE.txt https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE && \
-    if [ "$INSTALL_METHOD" = "installer" ]; then \
-        chmod +x $BAZEL_FILE && \
-        ./$BAZEL_FILE; \
-    else \
-        chmod +x $BAZEL_FILE && \
-        cp $BAZEL_FILE /usr/local/bin/bazel; \
-    fi && \
-    cd / && \
-    rm -f /bazel/$BAZEL_FILE
+
+# TODO: fork, audit, build ourselves
+RUN curl -o /etc/yum.repos.d/ohadm-bazel-epel-9.repo \
+    https://copr.fedorainfracloud.org/coprs/ohadm/bazel/repo/epel-9/ohadm-bazel-epel-9.repo && \
+    dnf install -y bazel5
 
 COPY . /mlmd-src
 WORKDIR /mlmd-src
@@ -108,7 +39,7 @@ RUN \
     sed -i "s/$PREVIOUS_ZETASQL_COMMIT/$CURRENT_ZETASQL_COMMIT/g" WORKSPACE && \
     sed -i "s/$PREVIOUS_ZETASQL_SHA/$CURRENT_ZETASQL_SHA/g" WORKSPACE
 
-# Running in offline mode with --nofetch arg, cache and deps must be cloned 
+# Running in offline mode with --nofetch arg, cache and deps must be cloned
 # into the local root bazel cache
 # "-std=c++17" is needed in order to build with ZetaSQL.
 RUN bazel build -c opt --action_env=PATH \
