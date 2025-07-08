@@ -20,10 +20,33 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "linux_aarch64",
+    values = {
+        "cpu": "aarch64",
+    },
+)
+
+config_setting(
+    name = "linux_arm64",
+    values = {
+        "cpu": "arm64",
+    },
+)
+
 selects.config_setting_group(
     name = "macos",
     match_any = [
         ":macos_x86_64",
+        ":macos_arm64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "aarch64",
+    match_any = [
+        ":linux_aarch64",
+        ":linux_arm64",
         ":macos_arm64",
     ],
 )

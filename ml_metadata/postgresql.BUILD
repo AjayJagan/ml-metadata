@@ -60,7 +60,6 @@ cc_library(
         "src/port/inet_net_ntop.c",
         "src/port/noblock.c",
         "src/port/path.c",
-        "src/port/pg_bitutils.c",
         "src/port/pg_crc32c_sb8.c",
         "src/port/pg_strong_random.c",
         "src/port/pgcheckdir.c",
@@ -78,6 +77,12 @@ cc_library(
         "src/port/tar.c",
         "src/port/thread.c",
     ] + select({
+        "@//ml_metadata:aarch64": [],
+        "//conditions:default": [
+            # pg_bitutils.c includes cpuid.h which is x86-specific
+            "src/port/pg_bitutils.c",
+        ],
+    }) + select({
         "@//ml_metadata:macos": [],
         "//conditions:default": [
             "src/port/getpeereid.c",
@@ -1102,7 +1107,9 @@ genrule(
             "/* #undef HAVE_X509_GET_SIGNATURE_NID */",
             "",
             "/* Define to 1 if the assembler supports X86_64's POPCNTQ instruction. */",
+            "#ifdef __x86_64__",
             "#define HAVE_X86_64_POPCNTQ 1",
+            "#endif",
             "",
             "/* Define to 1 if the system has the type `_Bool'. */",
             "#define HAVE__BOOL 1",
@@ -1144,7 +1151,9 @@ genrule(
             "/* #undef HAVE__CPUID */",
             "",
             "/* Define to 1 if you have __get_cpuid. */",
+            "#ifdef __x86_64__",
             "#define HAVE__GET_CPUID 1",
+            "#endif",
             "",
             "/* Define to 1 if your compiler understands _Static_assert. */",
             "#define HAVE__STATIC_ASSERT 1",
@@ -1208,7 +1217,7 @@ genrule(
             "#define PG_VERSION_NUM 120001",
             "",
             "/* A string containing the version number, platform, and C compiler */",
-            "#define PG_VERSION_STR \"PostgreSQL 12.17 on x86_64-apple-darwin19.2.0, compiled by Apple clang version 11.0.0 (clang-1100.0.33.17), 64-bit\"",
+            "#define PG_VERSION_STR \"PostgreSQL 12.17 compiled with Bazel\"",
             "",
             "/* Define to 1 to allow profiling output to be saved separately for each",
             "   process. */",
