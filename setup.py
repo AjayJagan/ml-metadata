@@ -158,7 +158,7 @@ setup(
     # six, and protobuf) with TF.
     install_requires=[
         'absl-py>=0.9,<2.0.0',
-        'attrs>=20.3,<24',
+        'attrs>=26.1,<27',
         'grpcio>=1.8.6,<2',
         'protobuf>=3.13,<4',
         'six>=1.10,<2',
